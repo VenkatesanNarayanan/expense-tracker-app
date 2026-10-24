@@ -637,7 +637,8 @@
     $('#payments-summary').textContent = 'Paid ' + inr.format(paidOf(e)) + ' of ' + inr.format(totalOf(e));
     $('#payments-list').innerHTML = pays.length
       ? pays.map((p, i) =>
-          '<div class="pay-row' + (state.focusPayment === (p.initial ? FIRST : p.id) ? ' focus' : '') + '">' +
+          '<div class="pay-row' + (state.focusPayment === (p.initial ? FIRST : p.id) ? ' focus' : '') + '"' +
+            ' role="button" tabindex="0" data-edit-payment="' + esc(p.initial ? FIRST : p.id) + '" title="Edit this payment">' +
             '<div class="pay-main">' +
               '<div><b>' + esc(prettyDate(p.date)) + '</b>' + (p.initial ? ' <span class="muted small">· first payment</span>' : '') + '</div>' +
               '<div class="small muted">' +
@@ -651,28 +652,81 @@
         ).join('')
       : '<div class="muted small">No payments yet.</div>';
 
+    setPaymentFormForAdd(e);
+  }
+
+  /** Payment form in "add" mode: shown only while the bill has a balance. */
+  function setPaymentFormForAdd(e) {
     const pf = $('#payment-form');
+    const due = dueOf(e);
+    state.editingPayment = null;
+    pf.reset();
     pf.hidden = !(due > 0);
     $('#paid-in-full').hidden = due > 0;
+    $('#pay-form-title').textContent = 'Add payment';
+    $('#pay-form-submit').textContent = 'Add payment';
+    $('#pay-form-cancel').hidden = true;
+    $('#pay-note-field').hidden = false;
+    $$('#payments-list .pay-row').forEach(r => r.classList.remove('editing'));
     if (due > 0) {
-      pf.reset();
       pf.date.value = today();
       pf.amount.value = due;
       pf.amount.max = due;
     }
   }
 
+  /** Payment form in "edit" mode for one payment (FIRST = the bill's own first payment). */
+  function editPayment(id) {
+    const bill = state.editing;
+    const p = paymentsOf(bill).find(x => (x.initial ? FIRST : x.id) === id);
+    if (!p) return;
+    const pf = $('#payment-form');
+    state.editingPayment = id;
+    pf.hidden = false;
+    $('#paid-in-full').hidden = true;
+    pf.date.value = p.date;
+    pf.amount.value = p.amount;
+    pf.amount.max = bill.totalAmount === '' ? '' : Math.round((bill.totalAmount - paidOf(bill) + p.amount) * 100) / 100;
+    pf.paymentMode.value = p.paymentMode || '';
+    pf.note.value = p.note || '';
+    $('#pay-note-field').hidden = id === FIRST; // the first payment has no note
+    $('#pay-form-title').textContent = id === FIRST ? 'Edit first payment' : 'Edit payment';
+    $('#pay-form-submit').textContent = 'Update payment';
+    $('#pay-form-cancel').hidden = false;
+    $$('#payments-list .pay-row').forEach(r => r.classList.toggle('editing', r.dataset.editPayment === id));
+    pf.scrollIntoView({ block: 'center' });
+  }
+
   async function onAddPayment(ev) {
     ev.preventDefault();
     const pf = $('#payment-form');
+    const pay = {
+      date: pf.date.value,
+      amount: pf.amount.value,
+      paymentMode: pf.paymentMode.value,
+      note: pf.note.value.trim(),
+    };
+    const bill = state.editing;
     try {
-      const bill = await busy(call('addPayment', state.trackerKey, state.editing.id, {
-        date: pf.date.value,
-        amount: pf.amount.value,
-        paymentMode: pf.paymentMode.value,
-        note: pf.note.value.trim(),
-      }));
-      afterPaymentChange(bill, 'Payment added');
+      let updated;
+      if (state.editingPayment === FIRST) {
+        // The first payment lives on the bill row: save the bill with the new date/amount/mode.
+        updated = await busy(call('updateExpense', state.trackerKey, bill.id, {
+          date: pay.date,
+          amount: pay.amount,
+          paymentMode: pay.paymentMode,
+          totalAmount: bill.totalAmount,
+          category: bill.category,
+          paidTo: bill.paidTo,
+          description: bill.description,
+          receiptUrl: bill.receiptUrl,
+        }));
+      } else if (state.editingPayment) {
+        updated = await busy(call('updatePayment', state.trackerKey, state.editingPayment, pay));
+      } else {
+        updated = await busy(call('addPayment', state.trackerKey, bill.id, pay));
+      }
+      afterPaymentChange(updated, state.editingPayment ? 'Payment updated' : 'Payment added');
     } catch (e) { /* shown */ }
   }
 
@@ -695,6 +749,7 @@
   function afterPaymentChange(bill, msg) {
     state.editing = bill;
     state.focusPayment = null;
+    form.date.value = bill.date;
     form.amount.value = bill.amount || '';
     form.totalAmount.value = bill.totalAmount === '' || bill.totalAmount == null ? '' : bill.totalAmount;
     form.paymentMode.value = bill.paymentMode;
@@ -995,8 +1050,18 @@
     });
     $('#payments-list').addEventListener('click', ev => {
       const b = ev.target.closest('[data-del-payment]');
-      if (b) onDeletePayment(b.dataset.delPayment);
+      if (b) return onDeletePayment(b.dataset.delPayment);
+      const row = ev.target.closest('[data-edit-payment]');
+      if (row) editPayment(row.dataset.editPayment);
     });
+    $('#payments-list').addEventListener('keydown', ev => {
+      const row = ev.target.closest('[data-edit-payment]');
+      if (row && !ev.target.closest('[data-del-payment]') && (ev.key === 'Enter' || ev.key === ' ')) {
+        ev.preventDefault();
+        editPayment(row.dataset.editPayment);
+      }
+    });
+    $('#pay-form-cancel').addEventListener('click', () => setPaymentFormForAdd(state.editing));
     $('#form-delete').addEventListener('click', () => state.editing && onDelete(state.editing.id));
 
     $$('.presets button').forEach(b => b.addEventListener('click', () => applyPreset(b.dataset.preset)));

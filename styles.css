@@ -336,3 +336,6 @@
   .form-mode { margin-bottom: 12px; }
   .pay-row.focus { background: var(--surface-2); margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
   #views { margin-top: 16px; }
+  .pay-row { cursor: pointer; }
+  .pay-row.editing { background: var(--surface-2); margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
+  .pay-form-title { margin: 0 0 10px; font-size: 15px; }
