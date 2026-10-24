@@ -6,6 +6,8 @@
     trackerKey: null,
     filters: { from: '', to: '', category: '', vendor: '', q: '' },
     allExpenses: [],
+    allPending: [],
+    pending: [],
     expenses: [],
     vendors: [],
     editing: null,
@@ -158,6 +160,7 @@
     renderTrackerTabs();
     fillSelect(form.paymentMode, state.boot.paymentModes, '— Select —');
     fillSelect($('#payment-form').paymentMode, state.boot.paymentModes, '— Select —');
+    fillSelect($('#pay-bill-form').paymentMode, state.boot.paymentModes, '— Select —');
     await switchTracker(state.trackerKey);
   }
 
@@ -255,6 +258,7 @@
     const cacheKey = 'et.cache.list.' + state.trackerKey + '.' + JSON.stringify(serverFilters);
     const res = await busy(cachedCall(cacheKey, 'listExpenses', state.trackerKey, serverFilters));
     state.allExpenses = res.expenses;
+    state.allPending = res.pending || [];
     state.vendors = res.vendors;
     $('#vendor-list').innerHTML = res.vendors.map(v => '<option value="' + esc(v) + '">').join('');
     render();
@@ -281,8 +285,10 @@
   function render() {
     const cat = state.filters.category;
     state.expenses = cat ? state.allExpenses.filter(e => e.category === cat) : state.allExpenses;
+    state.pending = cat ? state.allPending.filter(e => e.category === cat) : state.allPending;
     renderSummary();
     renderCategoryBars();
+    renderPending();
     renderList();
     if (state.view === 'reports') renderReports();
   }
@@ -317,9 +323,10 @@
 
   function renderSummary() {
     const total = state.expenses.reduce((s, e) => s + paidInRange(e), 0);
-    const pending = state.expenses.reduce((s, e) => s + dueOf(e), 0);
+    const pending = state.pending.reduce((s, e) => s + dueOf(e), 0);
+    const count = paymentItems().length;
     $('#total').textContent = inr.format(total);
-    $('#count').textContent = state.expenses.length;
+    $('#count').textContent = count + (count === 1 ? ' payment' : ' payments');
     $('#pending-box').hidden = !(pending > 0);
     $('#pending').textContent = inr.format(pending);
 
@@ -338,36 +345,57 @@
     badge.textContent = active + ' active';
   }
 
+  /** One item per payment made within the date filter, newest first. */
+  function paymentItems() {
+    const items = [];
+    state.expenses.forEach(bill => {
+      const pays = paymentsOf(bill);
+      pays.forEach((p, i) => {
+        if (inRange(p.date)) items.push({ bill: bill, pay: p, n: i + 1, of: pays.length });
+      });
+    });
+    return items.sort((a, b) => b.pay.date.localeCompare(a.pay.date) || b.n - a.n);
+  }
+
   function renderList() {
     const list = $('#list');
-    if (!state.expenses.length) {
-      list.innerHTML = '<div class="empty">No expenses yet for this filter.<br>Tap <b>+ Add</b> to record one.</div>';
+    const items = paymentItems();
+    if (!items.length) {
+      list.innerHTML = '<div class="empty">No payments yet for this filter.<br>Tap <b>+</b> to record one.</div>';
       return;
     }
     const byDay = new Map();
-    state.expenses.forEach(e => {
-      if (!byDay.has(e.date)) byDay.set(e.date, []);
-      byDay.get(e.date).push(e);
+    items.forEach(it => {
+      if (!byDay.has(it.pay.date)) byDay.set(it.pay.date, []);
+      byDay.get(it.pay.date).push(it);
     });
 
     let html = '';
-    byDay.forEach((items, date) => {
-      const dayTotal = items.reduce((s, e) => s + paidInRange(e), 0);
+    byDay.forEach((dayItems, date) => {
+      const dayTotal = dayItems.reduce((s, it) => s + it.pay.amount, 0);
       html += '<div class="day"><span>' + esc(dayLabel(date)) + '</span>' +
-        '<span>' + items.length + (items.length === 1 ? ' entry · ' : ' entries · ') + esc(inr.format(dayTotal)) + '</span></div>';
-      html += '<div class="day-group">' + items.map(entryHtml).join('') + '</div>';
+        '<span>' + dayItems.length + (dayItems.length === 1 ? ' payment · ' : ' payments · ') + esc(inr.format(dayTotal)) + '</span></div>';
+      html += '<div class="day-group">' + dayItems.map(entryHtml).join('') + '</div>';
     });
     list.innerHTML = html;
   }
 
-  function entryHtml(e) {
+  function personLabel(email) {
+    return state.boot && email === state.boot.user.email ? 'You' : String(email || '').split('@')[0];
+  }
+
+  /** A payment card: category | vendor + description + details | amount, with bill progress below. */
+  function entryHtml(it) {
+    const e = it.bill, p = it.pay;
     const title = e.paidTo || e.description || e.category;
     const sub = e.paidTo ? e.description : '';
-    const who = e.addedBy.split('@')[0];
-    const mine = state.boot && e.addedBy === state.boot.user.email;
-    const due = dueOf(e);
-    const nPayments = paymentsOf(e).length;
-    return '<div class="entry" role="button" tabindex="0" data-edit="' + esc(e.id) + '" aria-label="Edit ' + esc(title) + '">' +
+    const isBill = e.totalAmount !== '' && e.totalAmount != null || it.of > 1;
+    const meta = [
+      p.paymentMode ? esc((PAYMENT_ICONS[p.paymentMode] || '') + ' ' + p.paymentMode) : '',
+      esc(personLabel(p.addedBy || e.addedBy)),
+      p.note ? esc(p.note) : '',
+    ].filter(Boolean).join(' · ');
+    return '<div class="entry" role="button" tabindex="0" data-edit="' + esc(e.id) + '" aria-label="Open ' + esc(title) + '">' +
       '<div class="entry-cat">' +
         '<div class="entry-icon" aria-hidden="true">' + esc(categoryIcon(e.category)) + '</div>' +
         '<div class="entry-cat-name">' + esc(e.category) + '</div>' +
@@ -375,27 +403,54 @@
       '<div class="entry-main">' +
         '<div class="entry-title">' + esc(title) + '</div>' +
         (sub ? '<div class="entry-sub">' + esc(sub) + '</div>' : '') +
-        (e.receiptUrl || nPayments > 1
-          ? '<div class="entry-tags">' +
-              (e.receiptUrl
-                ? '<a class="tag tag-link" href="' + esc(e.receiptUrl) + '" target="_blank" rel="noopener" data-receipt>📎 Receipt</a>'
-                : '') +
-              (nPayments > 1 ? '<span class="tag">🧾 ' + nPayments + ' payments</span>' : '') +
-            '</div>'
-          : '') +
+        '<div class="entry-meta">' + meta +
+          (e.receiptUrl ? ' · <a href="' + esc(e.receiptUrl) + '" target="_blank" rel="noopener" data-receipt>📎 Receipt</a>' : '') +
+        '</div>' +
       '</div>' +
-      '<div class="entry-side">' +
-        '<div class="entry-amount">' + esc(inr.format(paidOf(e))) + '</div>' +
+      '<div class="entry-amount">' + esc(inr.format(p.amount)) + '</div>' +
+      (isBill ? billProgressHtml(e, 'Payment ' + it.n + ' of ' + it.of) : '') +
+    '</div>';
+  }
+
+  function billProgressHtml(e, lead) {
+    const total = totalOf(e), paid = paidOf(e), due = dueOf(e);
+    const pct = total > 0 ? Math.min(100, (paid / total) * 100) : 100;
+    return '<div class="bill-progress">' +
+      '<div class="bar"><span style="width:' + pct.toFixed(1) + '%"></span></div>' +
+      '<div class="bill-text">' + (lead ? esc(lead) + ' · ' : '') +
         (due > 0
-          ? '<div class="entry-of">of ' + esc(inr.format(totalOf(e))) + '</div>' +
-            '<span class="due">⏳ ' + esc(inr.format(due)) + ' due</span>'
-          : '') +
-        (e.paymentMode ? '<span class="tag">' + esc(PAYMENT_ICONS[e.paymentMode] || '') + ' ' + esc(e.paymentMode) + '</span>' : '') +
-        '<span class="who" title="' + esc(e.addedBy) + '">' +
-          '<span class="avatar">' + esc(who.charAt(0).toUpperCase()) + '</span>' + (mine ? 'You' : esc(who)) +
-        '</span>' +
+          ? '<b class="due">' + esc(inr.format(due)) + ' due</b> of ' + esc(inr.format(total))
+          : '<b class="done">✓ Paid in full</b> · ' + esc(inr.format(total))) +
       '</div>' +
     '</div>';
+  }
+
+  function renderPending() {
+    const card = $('#pending-card');
+    const bills = state.pending;
+    card.hidden = !bills.length;
+    if (!bills.length) return;
+    const due = bills.reduce((s, e) => s + dueOf(e), 0);
+    $('#pending-head').textContent = bills.length + ' · ' + inr.format(due) + ' due';
+    $('#pending-list').innerHTML = bills.map(e =>
+      '<div class="entry pending-row" role="button" tabindex="0" data-edit="' + esc(e.id) + '">' +
+        '<div class="entry-cat">' +
+          '<div class="entry-icon" aria-hidden="true">' + esc(categoryIcon(e.category)) + '</div>' +
+          '<div class="entry-cat-name">' + esc(e.category) + '</div>' +
+        '</div>' +
+        '<div class="entry-main">' +
+          '<div class="entry-title">' + esc(e.paidTo || e.description || e.category) + '</div>' +
+          (e.paidTo && e.description ? '<div class="entry-sub">' + esc(e.description) + '</div>' : '') +
+          '<div class="entry-meta">Billed ' + esc(prettyDate(e.date)) + '</div>' +
+        '</div>' +
+        '<div class="entry-amount">' + esc(inr.format(dueOf(e))) + '</div>' +
+        billProgressHtml(e, 'Paid ' + inr.format(paidOf(e))) +
+      '</div>'
+    ).join('');
+  }
+
+  function findBill(id) {
+    return state.allExpenses.find(x => x.id === id) || state.allPending.find(x => x.id === id);
   }
 
   const CATEGORY_ICONS = {
@@ -423,13 +478,13 @@
 
   function showView(view) {
     state.view = view;
-    $$('.view-tabs button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+    $$('#views button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
     $('#view-entries').hidden = view !== 'entries';
     $('#view-form').hidden = view !== 'form';
     $('#view-reports').hidden = view !== 'reports';
     $('#filters').hidden = view === 'form';
     $('.summary').hidden = view === 'form';
-    $('.view-tabs').hidden = view === 'form';
+    $('#views').hidden = view === 'form';
     $('#fab').hidden = view === 'form';
     if (view === 'reports') renderReports();
     window.scrollTo(0, 0);
@@ -445,6 +500,9 @@
     $('#current-receipt').hidden = true;
     $('#form-delete').hidden = true;
     $('#payments-card').hidden = true;
+    $('#form-mode').hidden = true;
+    form.hidden = false;
+    $('#pay-bill-form').hidden = true;
     lastCategory = '';
     $('#new-category').hidden = true;
     $('#amount-label').textContent = 'Paid now (₹)';
@@ -454,12 +512,65 @@
   function openAdd() {
     resetForm();
     showView('form');
+    $('#form-mode').hidden = !state.allPending.length;
+    setFormMode('new');
+  }
+
+  // ---------------------------------------------------------------- pay a pending bill
+
+  function setFormMode(mode) {
+    $$('#form-mode button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    form.hidden = mode !== 'new';
+    $('#pay-bill-form').hidden = mode !== 'pay';
+    if (mode === 'pay') fillPayBillForm();
+  }
+
+  function fillPayBillForm() {
+    const pf = $('#pay-bill-form');
+    pf.reset();
+    pf.bill.innerHTML = state.allPending.map(e =>
+      '<option value="' + esc(e.id) + '">' +
+        esc([e.paidTo || e.category, e.description].filter(Boolean).join(' · ') + ' — ' + inr.format(dueOf(e)) + ' due') +
+      '</option>'
+    ).join('');
+    pf.date.value = today();
+    onPayBillChange();
+  }
+
+  function onPayBillChange() {
+    const pf = $('#pay-bill-form');
+    const e = findBill(pf.bill.value);
+    if (!e) return;
+    pf.amount.value = dueOf(e);
+    pf.amount.max = dueOf(e);
+    $('#pay-bill-info').textContent = e.category + ' · billed ' + prettyDate(e.date) + ' · paid ' +
+      inr.format(paidOf(e)) + ' of ' + inr.format(totalOf(e)) + ' · ' + inr.format(dueOf(e)) + ' due';
+  }
+
+  async function onPayBill(ev) {
+    ev.preventDefault();
+    const pf = $('#pay-bill-form');
+    try {
+      await busy(call('addPayment', state.trackerKey, pf.bill.value, {
+        date: pf.date.value,
+        amount: pf.amount.value,
+        paymentMode: pf.paymentMode.value,
+        note: pf.note.value.trim(),
+      }));
+      toast('Payment added');
+      resetForm();
+      showView('entries');
+      await load();
+    } catch (e) { /* shown */ }
   }
 
   function openEdit(id) {
-    const e = state.expenses.find(x => x.id === id);
+    const e = findBill(id);
     if (!e) return;
     state.editing = e;
+    $('#form-mode').hidden = true;
+    $('#pay-bill-form').hidden = true;
+    form.hidden = false;
     form.reset();
     form.date.value = e.date;
     form.amount.value = e.amount || '';
@@ -649,7 +760,7 @@
   }
 
   async function onDelete(id) {
-    const e = state.expenses.find(x => x.id === id);
+    const e = findBill(id);
     if (!e) return;
     const extra = paymentsOf(e).length > 1 ? ' and its ' + paymentsOf(e).length + ' payments' : '';
     if (!confirm('Delete this ' + e.category + ' expense' + extra + ' (' + inr.format(paidOf(e)) + ' paid)?')) return;
@@ -820,7 +931,7 @@
       if (!ev.target.closest('#account-menu')) toggleAccountMenu(false);
     });
     document.addEventListener('keydown', ev => { if (ev.key === 'Escape') toggleAccountMenu(false); });
-    $$('.view-tabs button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
+    $$('#views button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
     $('#fab').addEventListener('click', openAdd);
     form.addEventListener('submit', onSubmit);
 
@@ -850,6 +961,14 @@
     form.amount.addEventListener('input', updateBalanceHint);
     form.totalAmount.addEventListener('input', updateBalanceHint);
     $('#payment-form').addEventListener('submit', onAddPayment);
+    $$('#form-mode button').forEach(b => b.addEventListener('click', () => setFormMode(b.dataset.mode)));
+    $('#pay-bill-form').addEventListener('submit', onPayBill);
+    $('#pay-bill-form').bill.addEventListener('change', onPayBillChange);
+    $('#pay-bill-form [data-cancel]').addEventListener('click', () => { resetForm(); showView('entries'); });
+    $('#pending-list').addEventListener('click', ev => {
+      const row = ev.target.closest('[data-edit]');
+      if (row) openEdit(row.dataset.edit);
+    });
     $('#payments-list').addEventListener('click', ev => {
       const b = ev.target.closest('[data-del-payment]');
       if (b) onDeletePayment(b.dataset.delPayment);

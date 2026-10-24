@@ -27,7 +27,10 @@
       --accent: #3987e5;
       --series-1: #3987e5;
     }
-    :root:not([data-theme="light"]) .due { color: #ec835a; }
+    :root:not([data-theme="light"]) .due,
+    :root:not([data-theme="light"]) .bill-text .due,
+    :root:not([data-theme="light"]) .pending-head,
+    :root:not([data-theme="light"]) .pending-row .entry-amount { color: #ec835a; }
   }
 
   * { box-sizing: border-box; }
@@ -201,17 +204,6 @@
     width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
     font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
   }
-  .entry-side {
-    display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
-    font-size: 12px; line-height: 18px; text-align: right;
-  }
-  /* Plain text (no pills) on the right so every line ends on the same edge. */
-  .entry-side .tag, .entry-side .due, .entry-side .who {
-    padding: 0; background: none; border-radius: 0; gap: 4px; white-space: nowrap;
-  }
-  .entry-side .tag { color: var(--text-2); }
-  .entry-side .entry-of { margin-top: 0; }
-  .entry-side .entry-amount { line-height: 22px; }
   .entry-amount {
     font-weight: 700; font-size: 16px; white-space: nowrap; font-variant-numeric: tabular-nums; padding-top: 1px;
   }
@@ -312,3 +304,24 @@
   .pay-form { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--grid); }
   .pay-form .actions { margin-top: 12px; }
   .paid-in-full { margin-top: 12px; color: var(--accent); font-weight: 600; font-size: 14px; }
+
+  /* ---- payment feed ---- */
+  .entry-meta { margin-top: 6px; font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .entry-meta a { color: var(--accent); text-decoration: none; }
+  .bill-progress { grid-column: 2 / 4; margin-top: 2px; }
+  .bill-progress .bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+  .bill-progress .bar span { display: block; height: 100%; border-radius: 3px; background: var(--series-1); }
+  .bill-text { margin-top: 5px; font-size: 12px; color: var(--text-2); }
+  .bill-text .due { padding: 0; background: none; border-radius: 0; font-weight: 600; color: #b4471a; }
+  .bill-text .done { color: var(--accent); font-weight: 600; }
+
+  .pending-card { padding: 0; overflow: hidden; }
+  .pending-card summary {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    padding: 14px 16px; cursor: pointer; font-weight: 600; font-size: 16px;
+  }
+  .pending-card[open] summary { border-bottom: 1px solid var(--grid); margin-bottom: 0; }
+  .pending-head { font-size: 13px; font-weight: 600; color: #b4471a; }
+  .pending-row .entry-amount { color: #b4471a; }
+
+  .form-mode { margin-bottom: 12px; }

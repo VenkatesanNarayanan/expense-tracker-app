@@ -73,11 +73,11 @@
             <div class="label">Pending</div>
             <div id="pending" class="hero-sm">—</div>
           </div>
-          <div class="sub"><span id="count">—</span> entries</div>
+          <div class="sub"><span id="count">—</span></div>
         </div>
       </section>
 
-      <nav class="view-tabs" aria-label="Views">
+      <nav id="views" class="view-tabs" aria-label="Views">
         <button data-view="entries" class="active">Overview</button>
         <button data-view="reports">Reports</button>
       </nav>
@@ -112,12 +112,38 @@
           </div>
           <div id="cat-bars"></div>
         </div>
-        <h2 class="list-title">Recent expenses</h2>
+        <details id="pending-card" class="card pending-card" open hidden>
+          <summary><span>Pending bills</span> <span id="pending-head" class="pending-head"></span></summary>
+          <div id="pending-list"></div>
+        </details>
+        <h2 class="list-title">Recent payments</h2>
         <div id="list"></div>
       </section>
 
       <!-- Add / edit form -->
       <section id="view-form" class="view" hidden>
+        <nav id="form-mode" class="view-tabs form-mode" aria-label="What are you adding?" hidden>
+          <button type="button" data-mode="new" class="active">New expense</button>
+          <button type="button" data-mode="pay">Pay pending bill</button>
+        </nav>
+
+        <!-- Pay an existing pending bill -->
+        <form id="pay-bill-form" class="card" autocomplete="off" hidden>
+          <h2>Pay pending bill</h2>
+          <div class="grid">
+            <label class="span2">Bill <select name="bill" required></select></label>
+            <div id="pay-bill-info" class="span2 balance-hint"></div>
+            <label>Date <input type="date" name="date" required></label>
+            <label>Amount (₹) <input type="number" name="amount" min="0.01" step="0.01" inputmode="decimal" required></label>
+            <label class="span2">Payment mode <select name="paymentMode"></select></label>
+            <label class="span2">Note <input type="text" name="note" maxlength="200" placeholder="Optional, e.g. 2nd installment"></label>
+          </div>
+          <div class="actions">
+            <button type="button" class="ghost" data-cancel>Cancel</button>
+            <button type="submit" class="primary">Save payment</button>
+          </div>
+        </form>
+
         <form id="expense-form" class="card" autocomplete="off">
           <h2 id="form-title">Add expense</h2>
           <div class="grid">
