@@ -430,12 +430,16 @@
   }
 
   function renderPending() {
-    const card = $('#pending-card');
-    const bills = state.pending;
-    card.hidden = !bills.length;
-    if (!bills.length) return;
+    const bills = state.allPending;
     const due = bills.reduce((s, e) => s + dueOf(e), 0);
-    $('#pending-head').textContent = bills.length + ' · ' + inr.format(due) + ' due';
+    $('#pending-count').hidden = !bills.length;
+    $('#pending-count').textContent = bills.length;
+    $('#pending-total').textContent = inr.format(due);
+    $('#pending-head').textContent = bills.length + (bills.length === 1 ? ' bill' : ' bills');
+    if (!bills.length) {
+      $('#pending-list').innerHTML = '<div class="empty">🎉 No pending bills. Everything is paid.</div>';
+      return;
+    }
     $('#pending-list').innerHTML = bills.map(e =>
       '<div class="entry pending-row" role="button" tabindex="0" data-edit="' + esc(e.id) + '">' +
         '<div class="entry-cat">' +
@@ -489,8 +493,9 @@
     $('#view-entries').hidden = view !== 'entries';
     $('#view-form').hidden = view !== 'form';
     $('#view-reports').hidden = view !== 'reports';
-    $('#filters').hidden = view === 'form';
-    $('.summary').hidden = view === 'form';
+    $('#view-pending').hidden = view !== 'pending';
+    $('#filters').hidden = view === 'form' || view === 'pending';
+    $('.summary').hidden = view === 'form' || view === 'pending';
     $('#views').hidden = view === 'form';
     $('#fab').hidden = view === 'form';
     if (view === 'reports') renderReports();

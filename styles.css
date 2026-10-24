@@ -29,7 +29,7 @@
     }
     :root:not([data-theme="light"]) .due,
     :root:not([data-theme="light"]) .bill-text .due,
-    :root:not([data-theme="light"]) .pending-head,
+    :root:not([data-theme="light"]) .pending-top .hero-sm,
     :root:not([data-theme="light"]) .pending-row .entry-side .entry-amount { color: #ec835a; }
   }
 
@@ -320,13 +320,18 @@
   .bill-text .due { padding: 0; background: none; border-radius: 0; font-weight: 600; color: #b4471a; }
   .bill-text .done { color: var(--accent); font-weight: 600; }
 
-  .pending-card { padding: 0; overflow: hidden; }
-  .pending-card summary {
-    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
-    padding: 14px 16px; cursor: pointer; font-weight: 600; font-size: 16px;
+  #views { grid-template-columns: repeat(3, 1fr); }
+  .tab-badge {
+    display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 999px;
+    background: #b4471a; color: #fff; font-size: 11px; line-height: 18px; font-weight: 700; text-align: center;
   }
-  .pending-card[open] summary { border-bottom: 1px solid var(--grid); margin-bottom: 0; }
-  .pending-head { font-size: 13px; font-weight: 600; color: #b4471a; }
+  .pending-card { padding: 0; overflow: hidden; }
+  .pending-top {
+    display: flex; justify-content: space-between; align-items: flex-end; gap: 12px;
+    padding: 14px 16px; border-bottom: 1px solid var(--grid);
+  }
+  .pending-top .label { font-size: 13px; color: var(--text-2); }
+  .pending-top .hero-sm { color: #b4471a; }
 
   .form-mode { margin-bottom: 12px; }
   .pay-row.focus { background: var(--surface-2); margin: 0 -16px; padding-left: 16px; padding-right: 16px; }

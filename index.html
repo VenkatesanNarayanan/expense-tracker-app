@@ -79,6 +79,7 @@
 
       <nav id="views" class="view-tabs" aria-label="Views">
         <button data-view="entries" class="active">Overview</button>
+        <button data-view="pending">Pending <span id="pending-count" class="tab-badge" hidden></span></button>
         <button data-view="reports">Reports</button>
       </nav>
 
@@ -112,12 +113,22 @@
           </div>
           <div id="cat-bars"></div>
         </div>
-        <details id="pending-card" class="card pending-card" open hidden>
-          <summary><span>Pending bills</span> <span id="pending-head" class="pending-head"></span></summary>
-          <div id="pending-list"></div>
-        </details>
         <h2 class="list-title">Recent payments</h2>
         <div id="list"></div>
+      </section>
+
+      <!-- Pending bills (all bills with a balance; ignores filters) -->
+      <section id="view-pending" class="view" hidden>
+        <div class="card pending-card">
+          <div class="pending-top">
+            <div>
+              <div class="label">Total due</div>
+              <div id="pending-total" class="hero-sm">—</div>
+            </div>
+            <div id="pending-head" class="small muted"></div>
+          </div>
+          <div id="pending-list"></div>
+        </div>
       </section>
 
       <!-- Add / edit form -->
