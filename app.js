@@ -350,8 +350,12 @@
     const items = [];
     state.expenses.forEach(bill => {
       const pays = paymentsOf(bill);
+      let paidSoFar = 0;
       pays.forEach((p, i) => {
-        if (inRange(p.date)) items.push({ bill: bill, pay: p, n: i + 1, of: pays.length });
+        paidSoFar += p.amount;
+        // Balance left right after this payment (payments are oldest first).
+        const dueAfter = Math.max(0, Math.round((totalOf(bill) - paidSoFar) * 100) / 100);
+        if (inRange(p.date)) items.push({ bill: bill, pay: p, n: i + 1, of: pays.length, dueAfter: dueAfter });
       });
     });
     return items.sort((a, b) => b.pay.date.localeCompare(a.pay.date) || b.n - a.n);
@@ -402,7 +406,7 @@
       '<div class="entry-main">' +
         '<div class="entry-title">' + esc(title) + '</div>' +
         (sub ? '<div class="entry-sub">' + esc(sub) + '</div>' : '') +
-        (isBill ? billStatusHtml(e, 'Payment ' + it.n + ' of ' + it.of) : '') +
+        (isBill ? billStatusHtml(e, 'Payment ' + it.n + ' of ' + it.of, it.dueAfter) : '') +
         (extra ? '<div class="entry-meta">' + extra + '</div>' : '') +
       '</div>' +
       '<div class="entry-side">' +
@@ -414,13 +418,14 @@
     '</div>';
   }
 
-  function billStatusHtml(e, lead) {
-    const due = dueOf(e);
-    return '<div class="bill-text">' + (lead ? esc(lead) + ' · ' : '') +
-      (due > 0
-        ? '<b class="due">' + esc(inr.format(due)) + ' due</b> of ' + esc(inr.format(totalOf(e)))
-        : '<b class="done">✓ Paid in full</b> · ' + esc(inr.format(totalOf(e)))) +
-    '</div>';
+  /** Two short lines: "Payment n of m · Bill ₹X" and the balance left right after this payment. */
+  function billStatusHtml(e, lead, dueAfter) {
+    return '<div class="bill-text">' + esc(lead) + ' · Bill ' + esc(inr.format(totalOf(e))) + '</div>' +
+      '<div class="bill-text">' +
+        (dueAfter > 0
+          ? '<b class="due">' + esc(inr.format(dueAfter)) + ' left after this</b>'
+          : '<b class="done">✓ Paid in full</b>') +
+      '</div>';
   }
 
   function renderPending() {
