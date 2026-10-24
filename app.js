@@ -384,16 +384,15 @@
     return state.boot && email === state.boot.user.email ? 'You' : String(email || '').split('@')[0];
   }
 
-  /** A payment card: category | vendor + description + details | amount, with bill progress below. */
+  /** A payment card: category | vendor, description, bill status | amount, mode, who. */
   function entryHtml(it) {
     const e = it.bill, p = it.pay;
     const title = e.paidTo || e.description || e.category;
     const sub = e.paidTo ? e.description : '';
     const isBill = e.totalAmount !== '' && e.totalAmount != null || it.of > 1;
-    const meta = [
-      p.paymentMode ? esc((PAYMENT_ICONS[p.paymentMode] || '') + ' ' + p.paymentMode) : '',
-      esc(personLabel(p.addedBy || e.addedBy)),
+    const extra = [
       p.note ? esc(p.note) : '',
+      e.receiptUrl ? '<a href="' + esc(e.receiptUrl) + '" target="_blank" rel="noopener" data-receipt>📎 Receipt</a>' : '',
     ].filter(Boolean).join(' · ');
     return '<div class="entry" role="button" tabindex="0" data-edit="' + esc(e.id) + '" aria-label="Open ' + esc(title) + '">' +
       '<div class="entry-cat">' +
@@ -403,25 +402,24 @@
       '<div class="entry-main">' +
         '<div class="entry-title">' + esc(title) + '</div>' +
         (sub ? '<div class="entry-sub">' + esc(sub) + '</div>' : '') +
-        '<div class="entry-meta">' + meta +
-          (e.receiptUrl ? ' · <a href="' + esc(e.receiptUrl) + '" target="_blank" rel="noopener" data-receipt>📎 Receipt</a>' : '') +
-        '</div>' +
+        (isBill ? billStatusHtml(e, 'Payment ' + it.n + ' of ' + it.of) : '') +
+        (extra ? '<div class="entry-meta">' + extra + '</div>' : '') +
       '</div>' +
-      '<div class="entry-amount">' + esc(inr.format(p.amount)) + '</div>' +
-      (isBill ? billProgressHtml(e, 'Payment ' + it.n + ' of ' + it.of) : '') +
+      '<div class="entry-side">' +
+        '<div class="entry-amount">' + esc(inr.format(p.amount)) + '</div>' +
+        (p.paymentMode ? '<div>' + esc((PAYMENT_ICONS[p.paymentMode] || '') + ' ' + p.paymentMode) + '</div>' : '') +
+        '<div class="who"><span class="avatar">' + esc(String(p.addedBy || e.addedBy).charAt(0).toUpperCase()) + '</span>' +
+          esc(personLabel(p.addedBy || e.addedBy)) + '</div>' +
+      '</div>' +
     '</div>';
   }
 
-  function billProgressHtml(e, lead) {
-    const total = totalOf(e), paid = paidOf(e), due = dueOf(e);
-    const pct = total > 0 ? Math.min(100, (paid / total) * 100) : 100;
-    return '<div class="bill-progress">' +
-      '<div class="bar"><span style="width:' + pct.toFixed(1) + '%"></span></div>' +
-      '<div class="bill-text">' + (lead ? esc(lead) + ' · ' : '') +
-        (due > 0
-          ? '<b class="due">' + esc(inr.format(due)) + ' due</b> of ' + esc(inr.format(total))
-          : '<b class="done">✓ Paid in full</b> · ' + esc(inr.format(total))) +
-      '</div>' +
+  function billStatusHtml(e, lead) {
+    const due = dueOf(e);
+    return '<div class="bill-text">' + (lead ? esc(lead) + ' · ' : '') +
+      (due > 0
+        ? '<b class="due">' + esc(inr.format(due)) + ' due</b> of ' + esc(inr.format(totalOf(e)))
+        : '<b class="done">✓ Paid in full</b> · ' + esc(inr.format(totalOf(e)))) +
     '</div>';
   }
 
@@ -441,10 +439,13 @@
         '<div class="entry-main">' +
           '<div class="entry-title">' + esc(e.paidTo || e.description || e.category) + '</div>' +
           (e.paidTo && e.description ? '<div class="entry-sub">' + esc(e.description) + '</div>' : '') +
-          '<div class="entry-meta">Billed ' + esc(prettyDate(e.date)) + '</div>' +
+          '<div class="bill-text">Paid ' + esc(inr.format(paidOf(e))) + ' of ' + esc(inr.format(totalOf(e))) +
+            ' · billed ' + esc(prettyDate(e.date)) + '</div>' +
         '</div>' +
-        '<div class="entry-amount">' + esc(inr.format(dueOf(e))) + '</div>' +
-        billProgressHtml(e, 'Paid ' + inr.format(paidOf(e))) +
+        '<div class="entry-side">' +
+          '<div class="entry-amount">' + esc(inr.format(dueOf(e))) + '</div>' +
+          '<div>due</div>' +
+        '</div>' +
       '</div>'
     ).join('');
   }
