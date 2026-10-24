@@ -345,17 +345,18 @@
       '<div class="entry-main">' +
         '<div class="entry-title">' + esc(title) + '</div>' +
         (sub ? '<div class="entry-sub">' + esc(sub) + '</div>' : '') +
-        '<div class="entry-tags">' +
-          (e.paymentMode ? '<span class="tag">' + esc(PAYMENT_ICONS[e.paymentMode] || '') + ' ' + esc(e.paymentMode) + '</span>' : '') +
-          (e.receiptUrl
-            ? '<a class="tag tag-link" href="' + esc(e.receiptUrl) + '" target="_blank" rel="noopener" data-receipt>📎 Receipt</a>'
-            : '') +
-          '<span class="who" title="' + esc(e.addedBy) + '">' +
-            '<span class="avatar">' + esc(who.charAt(0).toUpperCase()) + '</span>' + (mine ? 'You' : esc(who)) +
-          '</span>' +
-        '</div>' +
+        (e.receiptUrl
+          ? '<div class="entry-tags"><a class="tag tag-link" href="' + esc(e.receiptUrl) +
+            '" target="_blank" rel="noopener" data-receipt>📎 Receipt</a></div>'
+          : '') +
       '</div>' +
-      '<div class="entry-amount">' + esc(inr.format(e.amount)) + '</div>' +
+      '<div class="entry-side">' +
+        '<div class="entry-amount">' + esc(inr.format(e.amount)) + '</div>' +
+        (e.paymentMode ? '<span class="tag">' + esc(PAYMENT_ICONS[e.paymentMode] || '') + ' ' + esc(e.paymentMode) + '</span>' : '') +
+        '<span class="who" title="' + esc(e.addedBy) + '">' +
+          '<span class="avatar">' + esc(who.charAt(0).toUpperCase()) + '</span>' + (mine ? 'You' : esc(who)) +
+        '</span>' +
+      '</div>' +
     '</div>';
   }
 
