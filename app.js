@@ -16,7 +16,10 @@
   const $ = sel => document.querySelector(sel);
   const $$ = sel => Array.from(document.querySelectorAll(sel));
   const form = $('#expense-form');
-  const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const inrWhole = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+  const inrPaise = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  /** ₹2,40,000 for whole rupees, ₹96,250.50 otherwise. */
+  const inr = { format: n => (Math.round(n * 100) % 100 === 0 ? inrWhole : inrPaise).format(n) };
   const inrShort = new Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 });
 
   // ---------------------------------------------------------------- server
@@ -322,25 +325,56 @@
     let html = '';
     byDay.forEach((items, date) => {
       const dayTotal = items.reduce((s, e) => s + e.amount, 0);
-      html += '<div class="day"><span>' + esc(prettyDate(date)) + '</span><span>' + esc(inr.format(dayTotal)) + '</span></div>';
-      items.forEach(e => {
-        html += '<div class="entry">' +
-          '<div class="row1"><span class="chip">' + esc(e.category) + '</span>' +
-          '<span class="amount">' + esc(inr.format(e.amount)) + '</span></div>' +
-          (e.description ? '<div class="desc">' + esc(e.description) + '</div>' : '') +
-          '<div class="meta">' +
-            (e.paidTo ? '<span>To: ' + esc(e.paidTo) + '</span>' : '') +
-            (e.paymentMode ? '<span>' + esc(e.paymentMode) + '</span>' : '') +
-            '<span>By: ' + esc(e.addedBy.split('@')[0]) + '</span>' +
-          '</div>' +
-          '<div class="ops">' +
-            (e.receiptUrl ? '<a href="' + esc(e.receiptUrl) + '" target="_blank" rel="noopener">Receipt ↗</a>' : '') +
-            '<button data-edit="' + esc(e.id) + '">Edit</button>' +
-            '<button class="del" data-del="' + esc(e.id) + '">Delete</button>' +
-          '</div></div>';
-      });
+      html += '<div class="day"><span>' + esc(dayLabel(date)) + '</span>' +
+        '<span>' + items.length + (items.length === 1 ? ' entry · ' : ' entries · ') + esc(inr.format(dayTotal)) + '</span></div>';
+      html += '<div class="day-group">' + items.map(entryHtml).join('') + '</div>';
     });
     list.innerHTML = html;
+  }
+
+  function entryHtml(e) {
+    const title = e.description || e.paidTo || e.category;
+    const sub = [e.category, e.description && e.paidTo ? e.paidTo : ''].filter(Boolean).join(' · ');
+    const who = e.addedBy.split('@')[0];
+    const mine = state.boot && e.addedBy === state.boot.user.email;
+    return '<div class="entry" role="button" tabindex="0" data-edit="' + esc(e.id) + '" aria-label="Edit ' + esc(title) + '">' +
+      '<div class="entry-icon" aria-hidden="true">' + esc(categoryIcon(e.category)) + '</div>' +
+      '<div class="entry-main">' +
+        '<div class="entry-title">' + esc(title) + '</div>' +
+        '<div class="entry-sub">' + esc(sub) + '</div>' +
+        '<div class="entry-tags">' +
+          (e.paymentMode ? '<span class="tag">' + esc(PAYMENT_ICONS[e.paymentMode] || '') + ' ' + esc(e.paymentMode) + '</span>' : '') +
+          (e.receiptUrl
+            ? '<a class="tag tag-link" href="' + esc(e.receiptUrl) + '" target="_blank" rel="noopener" data-receipt>📎 Receipt</a>'
+            : '') +
+          '<span class="who" title="' + esc(e.addedBy) + '">' +
+            '<span class="avatar">' + esc(who.charAt(0).toUpperCase()) + '</span>' + (mine ? 'You' : esc(who)) +
+          '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="entry-amount">' + esc(inr.format(e.amount)) + '</div>' +
+    '</div>';
+  }
+
+  const CATEGORY_ICONS = {
+    'cement': '🪣', 'steel': '🔩', 'sand & aggregate': '⛰️', 'bricks/blocks': '🧱', 'labour': '👷',
+    'electrical': '💡', 'plumbing': '🚰', 'tiles/flooring': '🔲', 'paint': '🎨', 'wood/doors': '🚪',
+    'permits & fees': '📄', 'groceries': '🛒', 'utilities': '🔌', 'rent/emi': '🏦', 'education': '🎓',
+    'medical': '💊', 'transport/fuel': '⛽', 'dining': '🍽️', 'shopping': '🛍️', 'entertainment': '🎬',
+    'other': '📦',
+  };
+  const PAYMENT_ICONS = { 'Cash': '💵', 'UPI': '📱', 'Bank Transfer': '🏦', 'Cheque': '🧾', 'Card': '💳' };
+
+  /** Emoji for known categories; otherwise the category's first letter. */
+  function categoryIcon(cat) {
+    return CATEGORY_ICONS[String(cat).toLowerCase()] || String(cat).trim().charAt(0).toUpperCase() || '•';
+  }
+
+  function dayLabel(date) {
+    const t = new Date();
+    if (date === ymd(t)) return 'Today';
+    if (date === ymd(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1))) return 'Yesterday';
+    return prettyDate(date);
   }
 
   // ---------------------------------------------------------------- views
@@ -367,6 +401,7 @@
     form.date.value = today();
     $('#form-title').textContent = 'Add expense';
     $('#current-receipt').hidden = true;
+    $('#form-delete').hidden = true;
   }
 
   function openAdd() {
@@ -396,6 +431,7 @@
         '<input type="checkbox" name="removeReceipt" style="width:auto"> remove</label>'
       : '';
     $('#form-title').textContent = 'Edit expense';
+    $('#form-delete').hidden = false;
     showView('form');
   }
 
@@ -442,6 +478,8 @@
     try {
       await busy(call('deleteExpense', state.trackerKey, id));
       toast('Expense deleted');
+      resetForm();
+      showView('entries');
       await load();
     } catch (err) { /* shown */ }
   }
@@ -610,10 +648,15 @@
     $('#form-cancel').addEventListener('click', () => { resetForm(); showView('entries'); });
 
     $('#list').addEventListener('click', ev => {
-      const t = ev.target;
-      if (t.dataset.edit) openEdit(t.dataset.edit);
-      if (t.dataset.del) onDelete(t.dataset.del);
+      if (ev.target.closest('[data-receipt]')) return; // let the receipt link open
+      const card = ev.target.closest('[data-edit]');
+      if (card) openEdit(card.dataset.edit);
     });
+    $('#list').addEventListener('keydown', ev => {
+      const card = ev.target.closest('[data-edit]');
+      if (card && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); openEdit(card.dataset.edit); }
+    });
+    $('#form-delete').addEventListener('click', () => state.editing && onDelete(state.editing.id));
 
     $$('.presets button').forEach(b => b.addEventListener('click', () => applyPreset(b.dataset.preset)));
     $('#f-apply').addEventListener('click', () => { readFilters(); load(); });
