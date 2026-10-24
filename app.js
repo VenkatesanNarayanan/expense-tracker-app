@@ -419,7 +419,7 @@
     return '<div class="bill-text">' + esc(lead) + ' · Bill ' + esc(inr.format(totalOf(e))) + '</div>' +
       '<div class="bill-text">' +
         (dueAfter > 0
-          ? '<b class="due">' + esc(inr.format(dueAfter)) + ' left after this</b>'
+          ? '<b class="due">' + esc(inr.format(dueAfter)) + ' due after this</b>'
           : '<b class="done">✓ Paid in full</b>') +
       '</div>';
   }
