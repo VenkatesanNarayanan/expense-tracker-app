@@ -7,7 +7,6 @@
     filters: { from: '', to: '', category: '', vendor: '', q: '' },
     allExpenses: [],
     allPending: [],
-    pending: [],
     expenses: [],
     vendors: [],
     editing: null,
@@ -285,7 +284,6 @@
   function render() {
     const cat = state.filters.category;
     state.expenses = cat ? state.allExpenses.filter(e => e.category === cat) : state.allExpenses;
-    state.pending = cat ? state.allPending.filter(e => e.category === cat) : state.allPending;
     renderSummary();
     renderCategoryBars();
     renderPending();
@@ -323,12 +321,9 @@
 
   function renderSummary() {
     const total = state.expenses.reduce((s, e) => s + paidInRange(e), 0);
-    const pending = state.pending.reduce((s, e) => s + dueOf(e), 0);
     const count = paymentItems().length;
     $('#total').textContent = inr.format(total);
     $('#count').textContent = count + (count === 1 ? ' payment' : ' payments');
-    $('#pending-box').hidden = !(pending > 0);
-    $('#pending').textContent = inr.format(pending);
 
     const f = state.filters;
     const fmt = s => prettyDate(s).replace(/^\w+, /, '');

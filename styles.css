@@ -74,7 +74,7 @@
 
   .summary.card {
     display: flex; justify-content: space-between; align-items: flex-end;
-    margin-top: 16px; border: 0; color: #fff;
+    border: 0; color: #fff;
     background: linear-gradient(135deg, #1c5cab, #2a78d6 60%, #3987e5);
   }
   .summary .right { text-align: right; }
@@ -335,3 +335,4 @@
 
   .form-mode { margin-bottom: 12px; }
   .pay-row.focus { background: var(--surface-2); margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
+  #views { margin-top: 16px; }
