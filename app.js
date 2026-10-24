@@ -163,7 +163,7 @@
 
   function renderTrackerTabs() {
     $('#tracker-select').innerHTML = state.boot.trackers.map(t =>
-      '<option value="' + esc(t.key) + '">' + esc(t.name) + '</option>'
+      '<option value="' + esc(t.key) + '">' + esc((t.icon ? t.icon + '  ' : '') + t.name) + '</option>'
     ).join('');
     $('#tracker-select').value = state.trackerKey;
   }
@@ -229,7 +229,8 @@
     state.trackerKey = key;
     store('et.tracker', key);
     $('#tracker-select').value = key;
-    $('#tracker-icon').textContent = tracker().icon;
+    $('#tracker-icon').textContent = tracker().icon || tracker().name.charAt(0);
+    $('#tracker-name').textContent = tracker().name;
     document.title = tracker().name + ' · Expense Tracker';
 
     fillCategorySelects();

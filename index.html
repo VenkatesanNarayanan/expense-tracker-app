@@ -38,13 +38,18 @@
 
     <div id="app" hidden>
     <header class="topbar">
-      <div class="tracker-picker">
-        <span id="tracker-icon" class="tracker-icon" aria-hidden="true"></span>
-        <select id="tracker-select" aria-label="Tracker"></select>
-      </div>
       <div class="brand">
         <img src="icons/icon-192.png" alt="" width="30" height="30">
         <span>Expense Tracker</span>
+      </div>
+      <!-- Styled face with the real <select> laid invisibly on top, so tapping opens the native picker. -->
+      <div class="tracker-picker">
+        <span class="tracker-face" aria-hidden="true">
+          <span id="tracker-icon" class="tracker-icon"></span>
+          <span id="tracker-name" class="tracker-name"></span>
+          <span class="caret"></span>
+        </span>
+        <select id="tracker-select" aria-label="Tracker"></select>
       </div>
     </header>
     <div id="offline" class="offline" hidden>Offline — showing saved data</div>

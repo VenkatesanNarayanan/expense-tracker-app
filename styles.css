@@ -51,17 +51,23 @@
   }
   #user { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  .tracker-picker { display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .tracker-icon { font-size: 22px; line-height: 1; }
-  #tracker-select {
-    width: auto; max-width: 60vw; font-size: 18px; font-weight: 600; padding: 6px 30px 6px 10px;
-    border-radius: 10px; background-color: var(--surface-2); border-color: transparent;
-    appearance: none; -webkit-appearance: none; cursor: pointer;
-    background-image: linear-gradient(45deg, transparent 50%, var(--text-2) 50%),
-                      linear-gradient(135deg, var(--text-2) 50%, transparent 50%);
-    background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%;
-    background-size: 5px 5px; background-repeat: no-repeat;
+  .tracker-picker { position: relative; flex: none; }
+  .tracker-face {
+    display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+    background: var(--surface-2); font-size: 16px; font-weight: 600;
   }
+  .tracker-icon { font-size: 20px; line-height: 1; }
+  .tracker-name { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .caret {
+    width: 8px; height: 8px; margin-left: 2px; border-right: 2px solid var(--text-2); border-bottom: 2px solid var(--text-2);
+    transform: translateY(-2px) rotate(45deg);
+  }
+  #tracker-select {
+    position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;
+    font-size: 16px; /* stops iOS zooming in on focus */
+  }
+  .tracker-picker:focus-within .tracker-face { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (max-width: 480px) { .tracker-name { display: none; } }
 
   .summary.card {
     display: flex; justify-content: space-between; align-items: flex-end;
