@@ -27,7 +27,7 @@
       --accent: #3987e5;
       --series-1: #3987e5;
     }
-    :root:not([data-theme="light"]) .due { background: rgba(236, 131, 90, 0.18); color: #ec835a; }
+    :root:not([data-theme="light"]) .due { color: #ec835a; }
   }
 
   * { box-sizing: border-box; }
@@ -201,7 +201,17 @@
     width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
     font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
   }
-  .entry-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-size: 12px; }
+  .entry-side {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+    font-size: 12px; line-height: 18px; text-align: right;
+  }
+  /* Plain text (no pills) on the right so every line ends on the same edge. */
+  .entry-side .tag, .entry-side .due, .entry-side .who {
+    padding: 0; background: none; border-radius: 0; gap: 4px; white-space: nowrap;
+  }
+  .entry-side .tag { color: var(--text-2); }
+  .entry-side .entry-of { margin-top: 0; }
+  .entry-side .entry-amount { line-height: 22px; }
   .entry-amount {
     font-weight: 700; font-size: 16px; white-space: nowrap; font-variant-numeric: tabular-nums; padding-top: 1px;
   }
