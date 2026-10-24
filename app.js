@@ -214,6 +214,13 @@
     });
   }
 
+  function toggleAccountMenu(open) {
+    const menu = $('#account-menu');
+    const show = open === undefined ? menu.hidden : open;
+    menu.hidden = !show;
+    $('#brand').setAttribute('aria-expanded', String(show));
+  }
+
   async function logout() {
     if (!confirm('Sign out of Expense Tracker on this device?')) return;
     try { await call('logout'); } catch (e) { /* signing out locally anyway */ }
@@ -807,7 +814,12 @@
 
   function bindEvents() {
     $('#tracker-select').addEventListener('change', ev => switchTracker(ev.target.value));
-    $('#signout').addEventListener('click', logout);
+    $('#signout').addEventListener('click', () => { toggleAccountMenu(false); logout(); });
+    $('#brand').addEventListener('click', ev => { ev.stopPropagation(); toggleAccountMenu(); });
+    document.addEventListener('click', ev => {
+      if (!ev.target.closest('#account-menu')) toggleAccountMenu(false);
+    });
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape') toggleAccountMenu(false); });
     $$('.view-tabs button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
     $('#fab').addEventListener('click', openAdd);
     form.addEventListener('submit', onSubmit);

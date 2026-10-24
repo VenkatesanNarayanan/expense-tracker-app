@@ -38,9 +38,16 @@
 
     <div id="app" hidden>
     <header class="topbar">
-      <div class="brand">
-        <img src="icons/icon-192.png" alt="" width="30" height="30">
-        <span>Expense Tracker</span>
+      <div class="brand-wrap">
+        <button type="button" id="brand" class="brand" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu">
+          <img src="icons/icon-192.png" alt="" width="30" height="30">
+          <span>Expense Tracker</span>
+        </button>
+        <div id="account-menu" class="account-menu" role="menu" hidden>
+          <div class="small muted">Signed in as</div>
+          <div id="user-email" class="account-email"></div>
+          <button type="button" id="signout" class="ghost wide" role="menuitem">Sign out</button>
+        </div>
       </div>
       <!-- Styled face with the real <select> laid invisibly on top, so tapping opens the native picker. -->
       <div class="tracker-picker">
@@ -186,11 +193,6 @@
           </table>
         </div>
       </section>
-
-      <footer class="app-footer">
-        Signed in as <span id="user-email"></span> ·
-        <button type="button" id="signout" class="link">Sign out</button>
-      </footer>
 
       <datalist id="vendor-list"></datalist>
     </main>
