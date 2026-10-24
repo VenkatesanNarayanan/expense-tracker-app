@@ -215,7 +215,7 @@
   }
 
   async function logout() {
-    if (!confirm('Sign out of Expense Manager on this device?')) return;
+    if (!confirm('Sign out of Expense Tracker on this device?')) return;
     try { await call('logout'); } catch (e) { /* signing out locally anyway */ }
     signedOut();
   }
@@ -230,7 +230,7 @@
     store('et.tracker', key);
     $('#tracker-select').value = key;
     $('#tracker-icon').textContent = tracker().icon;
-    document.title = tracker().name + ' · Expense Manager';
+    document.title = tracker().name + ' · Expense Tracker';
 
     fillCategorySelects();
     state.filters.category = '';
