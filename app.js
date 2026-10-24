@@ -157,6 +157,7 @@
 
     renderTrackerTabs();
     fillSelect(form.paymentMode, state.boot.paymentModes, '— Select —');
+    fillSelect($('#payment-form').paymentMode, state.boot.paymentModes, '— Select —');
     await switchTracker(state.trackerKey);
   }
 
@@ -231,9 +232,7 @@
     $('#tracker-icon').textContent = tracker().icon;
     document.title = tracker().name + ' · Expense Tracker';
 
-    const cats = tracker().categories;
-    fillSelect($('#f-category'), cats, 'All');
-    fillSelect(form.category, cats, '— Select —');
+    fillCategorySelects();
     state.filters.category = '';
     if (state.view === 'form') resetForm();
     await load();
@@ -253,6 +252,24 @@
     render();
   }
 
+  // A bill's payments: its first payment (amount on the bill date) plus follow-ups.
+  function paymentsOf(e) {
+    return e.payments || [{ initial: true, date: e.date, amount: e.amount, paymentMode: e.paymentMode }];
+  }
+  function paidOf(e) { return e.paid != null ? e.paid : e.amount; }
+  function totalOf(e) { return e.total != null ? e.total : e.amount; }
+  function dueOf(e) { return e.due || 0; }
+
+  function inRange(date) {
+    const f = state.filters;
+    return (!f.from || date >= f.from) && (!f.to || date <= f.to);
+  }
+
+  /** Money actually paid on this bill within the current date filter. */
+  function paidInRange(e) {
+    return paymentsOf(e).filter(p => inRange(p.date)).reduce((s, p) => s + p.amount, 0);
+  }
+
   function render() {
     const cat = state.filters.category;
     state.expenses = cat ? state.allExpenses.filter(e => e.category === cat) : state.allExpenses;
@@ -270,8 +287,8 @@
 
   function renderCategoryBars() {
     const totals = new Map();
-    state.allExpenses.forEach(e => totals.set(e.category, (totals.get(e.category) || 0) + e.amount));
-    const rows = Array.from(totals.entries()).sort((a, b) => b[1] - a[1]);
+    state.allExpenses.forEach(e => totals.set(e.category, (totals.get(e.category) || 0) + paidInRange(e)));
+    const rows = Array.from(totals.entries()).filter(r => r[1] > 0).sort((a, b) => b[1] - a[1]);
     const grand = rows.reduce((s, r) => s + r[1], 0);
     const max = rows.length ? rows[0][1] : 0;
     const selected = state.filters.category;
@@ -291,9 +308,12 @@
   }
 
   function renderSummary() {
-    const total = state.expenses.reduce((s, e) => s + e.amount, 0);
+    const total = state.expenses.reduce((s, e) => s + paidInRange(e), 0);
+    const pending = state.expenses.reduce((s, e) => s + dueOf(e), 0);
     $('#total').textContent = inr.format(total);
     $('#count').textContent = state.expenses.length;
+    $('#pending-box').hidden = !(pending > 0);
+    $('#pending').textContent = inr.format(pending);
 
     const f = state.filters;
     const fmt = s => prettyDate(s).replace(/^\w+, /, '');
@@ -324,7 +344,7 @@
 
     let html = '';
     byDay.forEach((items, date) => {
-      const dayTotal = items.reduce((s, e) => s + e.amount, 0);
+      const dayTotal = items.reduce((s, e) => s + paidInRange(e), 0);
       html += '<div class="day"><span>' + esc(dayLabel(date)) + '</span>' +
         '<span>' + items.length + (items.length === 1 ? ' entry · ' : ' entries · ') + esc(inr.format(dayTotal)) + '</span></div>';
       html += '<div class="day-group">' + items.map(entryHtml).join('') + '</div>';
@@ -337,6 +357,8 @@
     const sub = e.paidTo ? e.description : '';
     const who = e.addedBy.split('@')[0];
     const mine = state.boot && e.addedBy === state.boot.user.email;
+    const due = dueOf(e);
+    const nPayments = paymentsOf(e).length;
     return '<div class="entry" role="button" tabindex="0" data-edit="' + esc(e.id) + '" aria-label="Edit ' + esc(title) + '">' +
       '<div class="entry-cat">' +
         '<div class="entry-icon" aria-hidden="true">' + esc(categoryIcon(e.category)) + '</div>' +
@@ -345,13 +367,21 @@
       '<div class="entry-main">' +
         '<div class="entry-title">' + esc(title) + '</div>' +
         (sub ? '<div class="entry-sub">' + esc(sub) + '</div>' : '') +
-        (e.receiptUrl
-          ? '<div class="entry-tags"><a class="tag tag-link" href="' + esc(e.receiptUrl) +
-            '" target="_blank" rel="noopener" data-receipt>📎 Receipt</a></div>'
+        (e.receiptUrl || nPayments > 1
+          ? '<div class="entry-tags">' +
+              (e.receiptUrl
+                ? '<a class="tag tag-link" href="' + esc(e.receiptUrl) + '" target="_blank" rel="noopener" data-receipt>📎 Receipt</a>'
+                : '') +
+              (nPayments > 1 ? '<span class="tag">🧾 ' + nPayments + ' payments</span>' : '') +
+            '</div>'
           : '') +
       '</div>' +
       '<div class="entry-side">' +
-        '<div class="entry-amount">' + esc(inr.format(e.amount)) + '</div>' +
+        '<div class="entry-amount">' + esc(inr.format(paidOf(e))) + '</div>' +
+        (due > 0
+          ? '<div class="entry-of">of ' + esc(inr.format(totalOf(e))) + '</div>' +
+            '<span class="due">⏳ ' + esc(inr.format(due)) + ' due</span>'
+          : '') +
         (e.paymentMode ? '<span class="tag">' + esc(PAYMENT_ICONS[e.paymentMode] || '') + ' ' + esc(e.paymentMode) + '</span>' : '') +
         '<span class="who" title="' + esc(e.addedBy) + '">' +
           '<span class="avatar">' + esc(who.charAt(0).toUpperCase()) + '</span>' + (mine ? 'You' : esc(who)) +
@@ -406,6 +436,11 @@
     $('#form-title').textContent = 'Add expense';
     $('#current-receipt').hidden = true;
     $('#form-delete').hidden = true;
+    $('#payments-card').hidden = true;
+    lastCategory = '';
+    $('#new-category').hidden = true;
+    $('#amount-label').textContent = 'Paid now (₹)';
+    updateBalanceHint();
   }
 
   function openAdd() {
@@ -419,11 +454,12 @@
     state.editing = e;
     form.reset();
     form.date.value = e.date;
-    form.amount.value = e.amount;
+    form.amount.value = e.amount || '';
+    form.totalAmount.value = e.totalAmount === '' || e.totalAmount == null ? '' : e.totalAmount;
     if (!tracker().categories.includes(e.category)) {
       form.category.insertAdjacentHTML('beforeend', '<option>' + esc(e.category) + '</option>');
     }
-    form.category.value = e.category;
+    form.category.value = lastCategory = e.category;
     form.paymentMode.value = e.paymentMode;
     form.paidTo.value = e.paidTo;
     form.description.value = e.description;
@@ -436,7 +472,135 @@
       : '';
     $('#form-title').textContent = 'Edit expense';
     $('#form-delete').hidden = false;
+    $('#new-category').hidden = true;
+    $('#amount-label').textContent = paymentsOf(e).length > 1 ? 'First payment (₹)' : 'Paid now (₹)';
+    renderPayments(e);
+    updateBalanceHint();
     showView('form');
+  }
+
+  /** Follow-up payments on the bill being edited (excludes the first payment). */
+  function followUpTotal() {
+    if (!state.editing) return 0;
+    return paymentsOf(state.editing).filter(p => !p.initial).reduce((s, p) => s + p.amount, 0);
+  }
+
+  function updateBalanceHint() {
+    const hint = $('#balance-hint');
+    const total = Number(form.totalAmount.value) || 0;
+    const paid = (Number(form.amount.value) || 0) + followUpTotal();
+    hint.hidden = !(total > 0);
+    hint.classList.toggle('error', paid > total);
+    hint.textContent = paid > total
+      ? 'Paid (' + inr.format(paid) + ') is more than the total.'
+      : paid === total
+        ? '✓ Fully paid'
+        : 'Balance due: ' + inr.format(total - paid) + (paid ? '  ·  paid ' + inr.format(paid) : '');
+  }
+
+  // ---------------------------------------------------------------- payments
+
+  function renderPayments(e) {
+    const card = $('#payments-card');
+    card.hidden = false;
+    const pays = paymentsOf(e);
+    const due = dueOf(e);
+    $('#payments-summary').textContent = 'Paid ' + inr.format(paidOf(e)) + ' of ' + inr.format(totalOf(e));
+    $('#payments-list').innerHTML = pays.length
+      ? pays.map((p, i) =>
+          '<div class="pay-row">' +
+            '<div class="pay-main">' +
+              '<div><b>' + esc(prettyDate(p.date)) + '</b>' + (p.initial ? ' <span class="muted small">· first payment</span>' : '') + '</div>' +
+              '<div class="small muted">' +
+                esc([p.paymentMode && (PAYMENT_ICONS[p.paymentMode] || '') + ' ' + p.paymentMode, p.note].filter(Boolean).join(' · ') || '—') +
+              '</div>' +
+            '</div>' +
+            '<div class="pay-amt">' + esc(inr.format(p.amount)) + '</div>' +
+            (p.initial ? '<span class="pay-del-spacer"></span>'
+              : '<button type="button" class="pay-del" data-del-payment="' + esc(p.id) + '" aria-label="Delete payment">✕</button>') +
+          '</div>'
+        ).join('')
+      : '<div class="muted small">No payments yet.</div>';
+
+    const pf = $('#payment-form');
+    pf.hidden = !(due > 0);
+    $('#paid-in-full').hidden = due > 0;
+    if (due > 0) {
+      pf.reset();
+      pf.date.value = today();
+      pf.amount.value = due;
+      pf.amount.max = due;
+    }
+  }
+
+  async function onAddPayment(ev) {
+    ev.preventDefault();
+    const pf = $('#payment-form');
+    try {
+      const bill = await busy(call('addPayment', state.trackerKey, state.editing.id, {
+        date: pf.date.value,
+        amount: pf.amount.value,
+        paymentMode: pf.paymentMode.value,
+        note: pf.note.value.trim(),
+      }));
+      afterPaymentChange(bill, 'Payment added');
+    } catch (e) { /* shown */ }
+  }
+
+  async function onDeletePayment(id) {
+    const p = paymentsOf(state.editing).find(x => x.id === id);
+    if (!p || !confirm('Delete payment of ' + inr.format(p.amount) + ' on ' + p.date + '?')) return;
+    try {
+      afterPaymentChange(await busy(call('deletePayment', state.trackerKey, id)), 'Payment deleted');
+    } catch (e) { /* shown */ }
+  }
+
+  function afterPaymentChange(bill, msg) {
+    state.editing = bill;
+    $('#amount-label').textContent = paymentsOf(bill).length > 1 ? 'First payment (₹)' : 'Paid now (₹)';
+    renderPayments(bill);
+    updateBalanceHint();
+    toast(msg);
+    load().catch(() => {});
+  }
+
+  // ---------------------------------------------------------------- categories
+
+  const NEW_CATEGORY = '__new__';
+  let lastCategory = '';
+
+  function fillCategorySelects() {
+    const cats = tracker().categories;
+    fillSelect($('#f-category'), cats, 'All');
+    fillSelect(form.category, cats, '— Select —');
+    form.category.insertAdjacentHTML('beforeend', '<option value="' + NEW_CATEGORY + '">+ New category…</option>');
+  }
+
+  function onCategoryChange() {
+    if (form.category.value !== NEW_CATEGORY) {
+      lastCategory = form.category.value;
+      return;
+    }
+    form.category.value = lastCategory;
+    $('#new-category').hidden = false;
+    $('#new-category-name').value = '';
+    $('#new-category-name').focus();
+  }
+
+  async function onAddCategory() {
+    const name = $('#new-category-name').value.trim();
+    if (!name) return $('#new-category-name').focus();
+    try {
+      tracker().categories = await busy(call('addCategory', state.trackerKey, name));
+      store('et.cache.boot', JSON.stringify(state.boot));
+      const keepFilter = $('#f-category').value;
+      fillCategorySelects();
+      $('#f-category').value = keepFilter;
+      const added = tracker().categories.find(c => c.toLowerCase() === name.replace(/\s+/g, ' ').toLowerCase());
+      form.category.value = lastCategory = added || '';
+      $('#new-category').hidden = true;
+      toast('Category added');
+    } catch (e) { /* shown */ }
   }
 
   async function onSubmit(ev) {
@@ -452,6 +616,7 @@
       const data = {
         date: form.date.value,
         amount: form.amount.value,
+        totalAmount: form.totalAmount.value,
         category: form.category.value,
         paymentMode: form.paymentMode.value,
         paidTo: form.paidTo.value.trim(),
@@ -478,7 +643,8 @@
   async function onDelete(id) {
     const e = state.expenses.find(x => x.id === id);
     if (!e) return;
-    if (!confirm('Delete ' + inr.format(e.amount) + ' (' + e.category + ') on ' + e.date + '?')) return;
+    const extra = paymentsOf(e).length > 1 ? ' and its ' + paymentsOf(e).length + ' payments' : '';
+    if (!confirm('Delete this ' + e.category + ' expense' + extra + ' (' + inr.format(paidOf(e)) + ' paid)?')) return;
     try {
       await busy(call('deleteExpense', state.trackerKey, id));
       toast('Expense deleted');
@@ -571,12 +737,14 @@
     const byCat = new Map();
     let total = 0;
     state.expenses.forEach(e => {
-      const m = e.date.slice(0, 7);
-      const cur = byMonth.get(m) || { amount: 0, count: 0 };
-      cur.amount += e.amount; cur.count++;
-      byMonth.set(m, cur);
-      byCat.set(e.category, (byCat.get(e.category) || 0) + e.amount);
-      total += e.amount;
+      paymentsOf(e).filter(p => inRange(p.date)).forEach(p => {
+        const m = p.date.slice(0, 7);
+        const cur = byMonth.get(m) || { amount: 0, count: 0 };
+        cur.amount += p.amount; cur.count++;
+        byMonth.set(m, cur);
+        byCat.set(e.category, (byCat.get(e.category) || 0) + p.amount);
+        total += p.amount;
+      });
     });
 
     const months = Array.from(byMonth.keys()).sort();
@@ -659,6 +827,19 @@
     $('#list').addEventListener('keydown', ev => {
       const card = ev.target.closest('[data-edit]');
       if (card && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); openEdit(card.dataset.edit); }
+    });
+    form.category.addEventListener('change', onCategoryChange);
+    $('#new-category-add').addEventListener('click', onAddCategory);
+    $('#new-category-name').addEventListener('keydown', ev => {
+      if (ev.key === 'Enter') { ev.preventDefault(); onAddCategory(); }
+    });
+    $('#new-category-cancel').addEventListener('click', () => { $('#new-category').hidden = true; });
+    form.amount.addEventListener('input', updateBalanceHint);
+    form.totalAmount.addEventListener('input', updateBalanceHint);
+    $('#payment-form').addEventListener('submit', onAddPayment);
+    $('#payments-list').addEventListener('click', ev => {
+      const b = ev.target.closest('[data-del-payment]');
+      if (b) onDeletePayment(b.dataset.delPayment);
     });
     $('#form-delete').addEventListener('click', () => state.editing && onDelete(state.editing.id));
 

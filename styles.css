@@ -27,6 +27,7 @@
       --accent: #3987e5;
       --series-1: #3987e5;
     }
+    :root:not([data-theme="light"]) .due { background: rgba(236, 131, 90, 0.18); color: #ec835a; }
   }
 
   * { box-sizing: border-box; }
@@ -252,3 +253,34 @@
   #login-code input[name="code"] { font-size: 24px; letter-spacing: 8px; text-align: center; }
   button.wide { width: 100%; }
   #login-back { align-self: center; }
+
+  /* ---- bills & payments ---- */
+  .inline-add { display: flex; gap: 8px; align-items: center; }
+  .inline-add input { flex: 1; }
+  .inline-add button { padding: 9px 14px; }
+  .balance-hint {
+    font-size: 13px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); color: var(--text-2);
+  }
+  .balance-hint.error { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+
+  .entry-of { font-size: 12px; color: var(--muted); margin-top: -4px; }
+  .due {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+    background: rgba(236, 131, 90, 0.16); color: #b4471a; font-weight: 600;
+  }
+
+  #payments-card .card-head { flex-wrap: wrap; gap: 4px 12px; }
+  .pay-row {
+    display: grid; grid-template-columns: 1fr auto 28px; gap: 10px; align-items: center;
+    padding: 10px 0; border-top: 1px solid var(--grid);
+  }
+  .pay-row:first-child { border-top: 0; }
+  .pay-main { min-width: 0; font-size: 14px; }
+  .pay-amt { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pay-del {
+    width: 28px; height: 28px; border-radius: 50%; border: 0; background: var(--surface-2); color: var(--danger);
+    cursor: pointer; font-size: 12px;
+  }
+  .pay-form { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--grid); }
+  .pay-form .actions { margin-top: 12px; }
+  .paid-in-full { margin-top: 12px; color: var(--accent); font-weight: 600; font-size: 14px; }
