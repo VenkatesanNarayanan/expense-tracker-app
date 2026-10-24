@@ -1,7 +1,7 @@
 // Offline shell for the installed app. Network first so updates show up on the
 // next launch; falls back to the cached copy when offline. API calls (POST) are
 // never cached here - the app keeps its own copy of the last data it loaded.
-const CACHE = 'expense-tracker-v13';
+const CACHE = 'expense-tracker-v14';
 const SHELL = [
   './', 'index.html', 'styles.css', 'app.js', 'config.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',

@@ -329,3 +329,4 @@
   .pending-head { font-size: 13px; font-weight: 600; color: #b4471a; }
 
   .form-mode { margin-bottom: 12px; }
+  .pay-row.focus { background: var(--surface-2); margin: 0 -16px; padding-left: 16px; padding-right: 16px; }

@@ -398,7 +398,8 @@
       p.note ? esc(p.note) : '',
       e.receiptUrl ? '<a href="' + esc(e.receiptUrl) + '" target="_blank" rel="noopener" data-receipt>📎 Receipt</a>' : '',
     ].filter(Boolean).join(' · ');
-    return '<div class="entry" role="button" tabindex="0" data-edit="' + esc(e.id) + '" aria-label="Open ' + esc(title) + '">' +
+    return '<div class="entry" role="button" tabindex="0" data-edit="' + esc(e.id) + '"' +
+      ' data-pay="' + esc(p.initial ? FIRST : p.id) + '" aria-label="Open ' + esc(title) + '">' +
       '<div class="entry-cat">' +
         '<div class="entry-icon" aria-hidden="true">' + esc(categoryIcon(e.category)) + '</div>' +
         '<div class="entry-cat-name">' + esc(e.category) + '</div>' +
@@ -570,7 +571,8 @@
     } catch (e) { /* shown */ }
   }
 
-  function openEdit(id) {
+  function openEdit(id, focusPayment) {
+    state.focusPayment = focusPayment || null;
     const e = findBill(id);
     if (!e) return;
     state.editing = e;
@@ -602,6 +604,8 @@
     renderPayments(e);
     updateBalanceHint();
     showView('form');
+    // Opened from a payment card: jump to the payment list with that payment highlighted.
+    if (state.focusPayment && paymentsOf(e).length > 1) $('#payments-card').scrollIntoView({ block: 'start' });
   }
 
   /** Follow-up payments on the bill being edited (excludes the first payment). */
@@ -633,7 +637,7 @@
     $('#payments-summary').textContent = 'Paid ' + inr.format(paidOf(e)) + ' of ' + inr.format(totalOf(e));
     $('#payments-list').innerHTML = pays.length
       ? pays.map((p, i) =>
-          '<div class="pay-row">' +
+          '<div class="pay-row' + (state.focusPayment === (p.initial ? FIRST : p.id) ? ' focus' : '') + '">' +
             '<div class="pay-main">' +
               '<div><b>' + esc(prettyDate(p.date)) + '</b>' + (p.initial ? ' <span class="muted small">· first payment</span>' : '') + '</div>' +
               '<div class="small muted">' +
@@ -641,8 +645,8 @@
               '</div>' +
             '</div>' +
             '<div class="pay-amt">' + esc(inr.format(p.amount)) + '</div>' +
-            (p.initial ? '<span class="pay-del-spacer"></span>'
-              : '<button type="button" class="pay-del" data-del-payment="' + esc(p.id) + '" aria-label="Delete payment">✕</button>') +
+            '<button type="button" class="pay-del" data-del-payment="' + esc(p.initial ? FIRST : p.id) + '"' +
+              ' aria-label="Delete this payment">✕</button>' +
           '</div>'
         ).join('')
       : '<div class="muted small">No payments yet.</div>';
@@ -672,16 +676,28 @@
     } catch (e) { /* shown */ }
   }
 
+  const FIRST = 'first'; // marker for a bill's own (first) payment, which has no payment ID
+
   async function onDeletePayment(id) {
-    const p = paymentsOf(state.editing).find(x => x.id === id);
-    if (!p || !confirm('Delete payment of ' + inr.format(p.amount) + ' on ' + p.date + '?')) return;
+    const bill = state.editing;
+    const p = paymentsOf(bill).find(x => (x.initial ? FIRST : x.id) === id);
+    if (!p) return;
+    if (!confirm('Delete only this payment of ' + inr.format(p.amount) + ' on ' + prettyDate(p.date) + '?\n\n' +
+                 'The bill stays; its balance due goes up by ' + inr.format(p.amount) + '.')) return;
     try {
-      afterPaymentChange(await busy(call('deletePayment', state.trackerKey, id)), 'Payment deleted');
+      const updated = id === FIRST
+        ? await busy(call('deleteFirstPayment', state.trackerKey, bill.id))
+        : await busy(call('deletePayment', state.trackerKey, id));
+      afterPaymentChange(updated, 'Payment deleted');
     } catch (e) { /* shown */ }
   }
 
   function afterPaymentChange(bill, msg) {
     state.editing = bill;
+    state.focusPayment = null;
+    form.amount.value = bill.amount || '';
+    form.totalAmount.value = bill.totalAmount === '' || bill.totalAmount == null ? '' : bill.totalAmount;
+    form.paymentMode.value = bill.paymentMode;
     $('#amount-label').textContent = paymentsOf(bill).length > 1 ? 'First payment (₹)' : 'Paid now (₹)';
     renderPayments(bill);
     updateBalanceHint();
@@ -768,8 +784,10 @@
   async function onDelete(id) {
     const e = findBill(id);
     if (!e) return;
-    const extra = paymentsOf(e).length > 1 ? ' and its ' + paymentsOf(e).length + ' payments' : '';
-    if (!confirm('Delete this ' + e.category + ' expense' + extra + ' (' + inr.format(paidOf(e)) + ' paid)?')) return;
+    const n = paymentsOf(e).length;
+    const name = e.paidTo || e.description || e.category;
+    if (!confirm('Delete the WHOLE bill "' + name + '"' + (n > 1 ? ' and all ' + n + ' payments' : '') +
+                 ' (' + inr.format(paidOf(e)) + ' paid)?\n\nTo remove a single payment, use its ✕ in the Payments list instead.')) return;
     try {
       await busy(call('deleteExpense', state.trackerKey, id));
       toast('Expense deleted');
@@ -952,11 +970,11 @@
     $('#list').addEventListener('click', ev => {
       if (ev.target.closest('[data-receipt]')) return; // let the receipt link open
       const card = ev.target.closest('[data-edit]');
-      if (card) openEdit(card.dataset.edit);
+      if (card) openEdit(card.dataset.edit, card.dataset.pay);
     });
     $('#list').addEventListener('keydown', ev => {
       const card = ev.target.closest('[data-edit]');
-      if (card && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); openEdit(card.dataset.edit); }
+      if (card && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); openEdit(card.dataset.edit, card.dataset.pay); }
     });
     form.category.addEventListener('change', onCategoryChange);
     $('#new-category-add').addEventListener('click', onAddCategory);
