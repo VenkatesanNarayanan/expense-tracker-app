@@ -333,15 +333,18 @@
   }
 
   function entryHtml(e) {
-    const title = e.description || e.paidTo || e.category;
-    const sub = [e.category, e.description && e.paidTo ? e.paidTo : ''].filter(Boolean).join(' · ');
+    const title = e.paidTo || e.description || e.category;
+    const sub = e.paidTo ? e.description : '';
     const who = e.addedBy.split('@')[0];
     const mine = state.boot && e.addedBy === state.boot.user.email;
     return '<div class="entry" role="button" tabindex="0" data-edit="' + esc(e.id) + '" aria-label="Edit ' + esc(title) + '">' +
-      '<div class="entry-icon" aria-hidden="true">' + esc(categoryIcon(e.category)) + '</div>' +
+      '<div class="entry-cat">' +
+        '<div class="entry-icon" aria-hidden="true">' + esc(categoryIcon(e.category)) + '</div>' +
+        '<div class="entry-cat-name">' + esc(e.category) + '</div>' +
+      '</div>' +
       '<div class="entry-main">' +
         '<div class="entry-title">' + esc(title) + '</div>' +
-        '<div class="entry-sub">' + esc(sub) + '</div>' +
+        (sub ? '<div class="entry-sub">' + esc(sub) + '</div>' : '') +
         '<div class="entry-tags">' +
           (e.paymentMode ? '<span class="tag">' + esc(PAYMENT_ICONS[e.paymentMode] || '') + ' ' + esc(e.paymentMode) + '</span>' : '') +
           (e.receiptUrl
