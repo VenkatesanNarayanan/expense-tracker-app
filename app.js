@@ -145,7 +145,7 @@
     $('#login').hidden = true;
     $('#app').hidden = false;
     state.boot = await busy(cachedCall('et.cache.boot', 'getBootstrap'));
-    $('#user').textContent = state.boot.user.name;
+    $('#user-email').textContent = state.boot.user.email;
 
     if (!state.boot.trackers.length) {
       $('#list').innerHTML = '<div class="empty">No active trackers. Add one in the Trackers tab of the spreadsheet.</div>';
@@ -215,7 +215,7 @@
   }
 
   async function logout() {
-    if (!confirm('Sign out of Expense Tracker on this device?')) return;
+    if (!confirm('Sign out of Expense Manager on this device?')) return;
     try { await call('logout'); } catch (e) { /* signing out locally anyway */ }
     signedOut();
   }
@@ -230,7 +230,7 @@
     store('et.tracker', key);
     $('#tracker-select').value = key;
     $('#tracker-icon').textContent = tracker().icon;
-    document.title = tracker().name + ' · Expense Tracker';
+    document.title = tracker().name + ' · Expense Manager';
 
     fillCategorySelects();
     state.filters.category = '';
@@ -806,7 +806,7 @@
 
   function bindEvents() {
     $('#tracker-select').addEventListener('change', ev => switchTracker(ev.target.value));
-    $('#user').addEventListener('click', logout);
+    $('#signout').addEventListener('click', logout);
     $$('.view-tabs button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
     $('#fab').addEventListener('click', openAdd);
     form.addEventListener('submit', onSubmit);
