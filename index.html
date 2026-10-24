@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Expense Tracker</title>
+    <meta name="description" content="Track construction and family expenses">
+    <meta name="theme-color" content="#1c5cab">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Expenses">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <!-- Sign in -->
+    <section id="login" class="login" hidden>
+      <div class="login-card card">
+        <img src="icons/icon-192.png" alt="" width="64" height="64" class="login-logo">
+        <h1>Expense Tracker</h1>
+        <form id="login-email">
+          <p class="muted small">Enter your email and we'll send you a 6-digit sign-in code.</p>
+          <label>Email <input type="email" name="email" autocomplete="email" inputmode="email" required></label>
+          <button type="submit" class="primary wide">Send code</button>
+        </form>
+        <form id="login-code" hidden>
+          <p class="muted small">If <b id="login-sent-to"></b> is allowed, a code is on its way. Check your inbox (and spam).</p>
+          <label>Code <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code"
+                 pattern="[0-9]{6}" maxlength="6" required></label>
+          <button type="submit" class="primary wide">Sign in</button>
+          <button type="button" id="login-back" class="link">Use a different email</button>
+        </form>
+      </div>
+    </section>
+
+    <div id="app" hidden>
+    <header class="topbar">
+      <div class="tracker-picker">
+        <span id="tracker-icon" class="tracker-icon" aria-hidden="true"></span>
+        <select id="tracker-select" aria-label="Tracker"></select>
+      </div>
+      <button type="button" id="user" class="user-btn" title="Sign out"></button>
+    </header>
+    <div id="offline" class="offline" hidden>Offline — showing saved data</div>
+
+    <main>
+      <section class="summary card">
+        <div>
+          <div class="label">Total spent</div>
+          <div id="total" class="hero">—</div>
+          <div id="period" class="sub"></div>
+        </div>
+        <div class="right">
+          <div class="label">Entries</div>
+          <div id="count" class="hero-sm">—</div>
+        </div>
+      </section>
+
+      <nav class="view-tabs" aria-label="Views">
+        <button data-view="entries" class="active">Overview</button>
+        <button data-view="reports">Reports</button>
+      </nav>
+
+      <details id="filters" class="card filters">
+        <summary>Filters <span id="filter-badge" class="badge" hidden></span></summary>
+        <div class="presets">
+          <button type="button" data-preset="month">This month</button>
+          <button type="button" data-preset="lastmonth">Last month</button>
+          <button type="button" data-preset="year">This year</button>
+          <button type="button" data-preset="all">All time</button>
+        </div>
+        <div class="grid">
+          <label>From <input type="date" id="f-from"></label>
+          <label>To <input type="date" id="f-to"></label>
+          <label>Category <select id="f-category"></select></label>
+          <label>Paid to <input type="text" id="f-vendor" list="vendor-list" placeholder="Any"></label>
+          <label class="span2">Search <input type="search" id="f-q" placeholder="Description, vendor…"></label>
+        </div>
+        <div class="actions">
+          <button type="button" id="f-reset" class="ghost">Reset</button>
+          <button type="button" id="f-apply" class="primary">Apply</button>
+        </div>
+      </details>
+
+      <!-- Entries -->
+      <section id="view-entries" class="view">
+        <div class="card" id="cat-card">
+          <div class="card-head">
+            <h2>By category</h2>
+            <button type="button" id="cat-clear" class="link" hidden>Show all</button>
+          </div>
+          <div id="cat-bars"></div>
+        </div>
+        <h2 class="list-title">Recent expenses</h2>
+        <div id="list"></div>
+      </section>
+
+      <!-- Add / edit form -->
+      <section id="view-form" class="view" hidden>
+        <form id="expense-form" class="card" autocomplete="off">
+          <h2 id="form-title">Add expense</h2>
+          <div class="grid">
+            <label>Date <input type="date" name="date" required></label>
+            <label>Amount (₹) <input type="number" name="amount" min="0.01" step="0.01" inputmode="decimal" required></label>
+            <label>Category <select name="category" required></select></label>
+            <label>Payment mode <select name="paymentMode"></select></label>
+            <label class="span2">Paid to <input type="text" name="paidTo" list="vendor-list" placeholder="Vendor, shop or person"></label>
+            <label class="span2">Description <textarea name="description" rows="2" placeholder="e.g. 50 bags OPC 53 grade"></textarea></label>
+            <label class="span2">Receipt (photo or PDF)
+              <input type="file" name="receipt" accept="image/*,application/pdf">
+            </label>
+            <div id="current-receipt" class="span2 small" hidden></div>
+          </div>
+          <div class="actions">
+            <button type="button" id="form-cancel" class="ghost">Cancel</button>
+            <button type="submit" id="form-save" class="primary">Save</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Reports -->
+      <section id="view-reports" class="view" hidden>
+        <div class="card">
+          <h2>Monthly spend</h2>
+          <div class="chart-box"><canvas id="chart-monthly" aria-label="Monthly spend bar chart" role="img"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>By category</h2>
+          <table class="totals">
+            <thead><tr><th>Category</th><th class="num">Amount</th><th class="num">Share</th></tr></thead>
+            <tbody id="category-table"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h2>By month</h2>
+          <table class="totals">
+            <thead><tr><th>Month</th><th class="num">Amount</th><th class="num">Entries</th></tr></thead>
+            <tbody id="month-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <datalist id="vendor-list"></datalist>
+    </main>
+
+    <button type="button" id="fab" class="fab" aria-label="Add expense" title="Add expense">
+      <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+        <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      </svg>
+    </button>
+    </div>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+    <div id="loading" class="loading" hidden><div class="spinner"></div></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+    <script src="config.js"></script>
+    <script src="app.js" defer></script>
+  </body>
+</html>
